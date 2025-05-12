@@ -1,5 +1,6 @@
 "use client";
 
+import { farcasterFrame } from "@farcaster/frame-wagmi-connector";
 import { useCallback, useEffect, useState } from "react";
 import { hexToUint8Array } from "uint8array-extras";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
@@ -13,6 +14,7 @@ import {
 } from "wagmi";
 import { coinbaseWallet } from "wagmi/connectors";
 import { Button } from "@/components/Button";
+import { useFrame } from "@/context/frame-context";
 import { useXMTP } from "@/context/xmtp-context";
 import { env } from "@/lib/env";
 import {
@@ -28,10 +30,11 @@ const XMTP_INITIALIZING = "xmtp:initializing";
 const XMTP_INIT_TIMESTAMP = "xmtp:initTimestamp";
 
 export default function WalletConnection() {
+  const { context, isInMiniApp } = useFrame();
   const { initialize, initializing, client, error } = useXMTP();
   const { data: walletData } = useWalletClient();
   const { connect } = useConnect();
-  const { isConnected, connector } = useAccount();
+  const { isConnected, connector, address } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const [connectionType, setConnectionType] = useState<string>("");
   const [ephemeralAddress, setEphemeralAddress] = useState<string>("");
@@ -212,20 +215,40 @@ export default function WalletConnection() {
     error,
   ]);
 
+  // always connect to wagmi farcaster frame to retrieve wallet address
+  useEffect(() => {
+    if (!isConnected || !address) {
+      // if we are in a farcaster context, auto connect to the farcaster frame
+      if (context && isInMiniApp) {
+        setConnectionType("EOA Wallet");
+        localStorage.setItem(XMTP_CONNECTION_TYPE_KEY, "EOA Wallet");
+        connect({ connector: farcasterFrame() });
+      }
+
+      return;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, address, isInMiniApp]);
+
   // Connect with EOA wallet
-  const connectWithEOA = useCallback(() => {
+  const connectWithEOA = () => {
     if (initializing || localInitializing) return;
 
     setConnectionType("EOA Wallet");
     localStorage.setItem(XMTP_CONNECTION_TYPE_KEY, "EOA Wallet");
 
-    if (!isConnected) {
-      connect({ connector: injected() });
+    if (!isConnected || !address) {
+      if (context && isInMiniApp) {
+        connect({ connector: farcasterFrame() });
+      } else {
+        connect({ connector: injected() });
+      }
     }
-  }, [connect, isConnected, initializing, localInitializing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  };
 
   // Connect with Ephemeral Wallet
-  const connectWithEphemeral = useCallback(() => {
+  const connectWithEphemeral = () => {
     if (initializing || localInitializing) return;
 
     setConnectionType("Ephemeral Wallet");
@@ -238,10 +261,10 @@ export default function WalletConnection() {
     localStorage.setItem(XMTP_CONNECTION_TYPE_KEY, "Ephemeral Wallet");
 
     initializeXmtp(createEphemeralSigner(privateKey));
-  }, [initializeXmtp, initializing, localInitializing]);
+  };
 
   // Connect with Coinbase Smart Wallet
-  const connectWithCoinbaseSmartWallet = useCallback(() => {
+  const connectWithCoinbaseSmartWallet = () => {
     if (initializing || localInitializing) return;
 
     // Clear any previous errors that might have accumulated
@@ -259,7 +282,7 @@ export default function WalletConnection() {
         }),
       });
     }
-  }, [connect, initializing, localInitializing, isConnected, connector]);
+  };
 
   return (
     <div className="w-full flex flex-col gap-4">

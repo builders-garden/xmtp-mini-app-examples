@@ -1,43 +1,9 @@
 "use client";
 
-import { base, mainnet } from "viem/chains";
-import { cookieStorage, createConfig, createStorage, http, cookieToInitialState, type Config } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiProvider } from "wagmi";
-import { injected } from "wagmi/connectors";
 import React from "react";
-
-const chains = [mainnet, base] as const;
-
-// Function to clear wagmi cookies
-export const clearWagmiCookies = () => {
-  // wagmi uses these cookie keys
-  const wagmiCookieKeys = [
-    "wagmi.connected",
-    "wagmi.wallet",
-    "wagmi.store",
-    "wagmi.network",
-  ];
-
-  // Clear each wagmi cookie by setting expiration to past date
-  wagmiCookieKeys.forEach((key) => {
-    document.cookie = `${key}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-  });
-};
-
-export const wagmiConfig = createConfig({
-  storage: createStorage({
-    storage: cookieStorage,
-  }),
-  ssr: true,
-  chains: chains,
-  transports: {
-    [mainnet.id]: http("https://mainnet.llamarpc.com"),
-    [base.id]: http("https://base.llamarpc.com"),
-  },
-  // Add the injected connector for wallet connections
-  connectors: [injected()],
-});
+import { cookieToInitialState, WagmiProvider, type Config } from "wagmi";
+import { wagmiConfig } from "@/lib/wagmi";
 
 // Create query client for React Query
 const queryClient = new QueryClient();
@@ -59,4 +25,4 @@ export const CustomWagmiProvider = ({
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </WagmiProvider>
   );
-}; 
+};
